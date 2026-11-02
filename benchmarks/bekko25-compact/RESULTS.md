@@ -35,3 +35,23 @@ The reviewed raw compact Wasm SHA-256 was `8048f2220cf4b91d473b5aef7e617f776421c
 ## Recipe artifact and input attestation
 
 The 475-case comparison was repeated against the actual ICP recipe artifact `e77802fd1943cccb9ec016fe6b42df4c5ad490d298337cb22f62d1481eb09729`, linked to raw Cargo Wasm `8048f2220cf4b91d473b5aef7e617f776421c861921028bdb7ce1ee0d629c021` and `icp.yaml` SHA-256 `36c26675abfae6549667c15d6c331810b6f5350a2d8fa4eb941e7f91e42fe650`. PocketIC's installed and upgraded module hashes matched the recipe artifact. All 475 inputs passed; the maximum observed was 4,808,472,349 instructions. Japanese hits@1 were 42 -> 42 and hits@5 were 50 -> 50. The report rechecks the source/build/recipe records and hashes of both input fixtures. See the [compact guide](../../docs/BEKKO25-COMPACT.md) for installing the verified file and checking a live canister's module hash.
+
+## Attention instruction headroom
+
+2026-11-02. The original mainnet compact runtime reported up to 4,953,609,977 instructions on ten sampled 255-token queries. This exceeded the local 4.9B target. The same Wasm and English input reported 4,844,589,977 instructions on PocketIC 16 and 4,952,649,977 on mainnet; local measurements therefore do not establish the mainnet margin.
+
+The new runtime shares the intersection of four Attention windows while retaining the original key order. In PocketIC 16, a disposable canister was installed with the previous recipe, loaded with the pinned compact pack, and upgraded to the new recipe. All 384 output components matched bit-for-bit for 14 inputs. English examples:
+
+| Tokens | Old instructions | New instructions | Reduction |
+|---:|---:|---:|---:|
+| 192 | 3,518,020,853 | 3,450,480,937 | 67,539,916 |
+| 255 | 4,844,589,977 | 4,737,827,513 | 106,762,464 |
+| 256 | 4,832,875,000 | 4,724,403,602 | 108,471,398 |
+
+The actual new recipe was also upgraded over the prior compact recipe and compared to the prior 475-case output corpus: all vectors matched bit-for-bit, the verified pack was retained, and reactivation succeeded. The highest reported count was 4,737,767,513. The corpus comprises Japanese and multilingual fixtures, seeded inputs of lengths 2–256, and repeated-token boundaries; it does not prove equivalence for every input. The separate a8m Wasm was byte-for-byte unchanged by this build.
+
+The F32-vocabulary a25m canister was independently upgraded from runtime 3 to runtime 4 in PocketIC 11. All 416 inputs matched bit-for-bit, stable memory remained 418,447,360 B, and the post-activation heap was 151,453,696 B. The new F32 raw Wasm SHA-256 is `9bb600a6ad0171a834cedb12165d59c600c63d6459b9fca13ab279a4f3cb2e16`. Reproduce the lifecycle sweep with `bekko25-stable-verify` and `BEKKO25_VERIFY_ATTENTION=1`.
+
+The standard PocketIC 11 compact release verifier and independent provenance report also passed all 475 inputs against the F32 baseline. On the 50-question Japanese fixture, hits@1 were 42 -> 42 and hits@5 were 50 -> 50. The new compact maximum was 4,701,787,513 instructions in this environment; its heap and stable memory were 151,388,160 B and 124,518,400 B. This small retrieval fixture does not establish quality on other data.
+
+The old recipe SHA-256 is `e77802fd1943cccb9ec016fe6b42df4c5ad490d298337cb22f62d1481eb09729`; the new recipe SHA-256 is `e6ab7a0d507d8fd54cc2a724432afee73fafe8b435ce946244da224e49ccad64`. The compact pack SHA-256 remains `71b8c47a0a508dd5cd3e704d83934e900c8e634d2c52e7a02a85e882fa5be9c4`. Detailed output vectors remain local. The new recipe has not been measured on mainnet, so the local reductions are not a mainnet guarantee.

@@ -386,8 +386,9 @@ fn value_four(v:&[f32],kn:usize,h:usize,scores:&[f32],inverse:&[f32;4],first:&[u
     assert!(scores.len()==4*kn && out.len()>=count*H);
     for a in 0..count {assert!(first[a]<=last[a] && last[a]<=kn);}
     assert!(first[..count].windows(2).all(|w|w[0]<=w[1]) && last[..count].windows(2).all(|w|w[0]<=w[1]));
-    // SAFETY: bounds above cover all shared V loads, active score ranges and
-    // count disjoint output rows. Each accumulator retains increasing key order.
+    // SAFETY: the validated row windows bound V and score accesses. The
+    // common interval is active for all four rows; each accumulator sees keys
+    // in the same increasing order as the guarded path.
     unsafe {
 "#,
     );
@@ -396,20 +397,37 @@ fn value_four(v:&[f32],kn:usize,h:usize,scores:&[f32],inverse:&[f32;4],first:&[u
             s.push_str(&format!("let mut s{a}_{d}=f32x4_splat(0.);\n"));
         }
     }
-    s.push_str("for j in first[0]..last[count-1] {let src=v.as_ptr().add(j*H+h*D);\n");
-    for d in 0..16 {
-        s.push_str(&format!("let v{d}=v128_load(src.add({}).cast());\n", 4 * d));
-    }
-    for a in 0..4 {
-        s.push_str(&format!("if {a}<count && j>=first[{a}] && j<last[{a}] {{let prob=f32x4_splat(scores[{a}*kn+j]*inverse[{a}]);\n"));
+    for (name, guarded) in [("all_rows", false), ("guarded_rows", true)] {
+        s.push_str(&format!(
+            "macro_rules! {name} {{($key:expr)=>{{{{let j=$key;let src=v.as_ptr().add(j*H+h*D);\n"
+        ));
         for d in 0..16 {
-            s.push_str(&format!(
-                "s{a}_{d}=f32x4_add(s{a}_{d},f32x4_mul(prob,v{d}));\n"
-            ));
+            s.push_str(&format!("let v{d}=v128_load(src.add({}).cast());\n", 4 * d));
         }
-        s.push_str("}\n");
+        for a in 0..4 {
+            if guarded {
+                s.push_str(&format!(
+                    "if {a}<count && j>=first[{a}] && j<last[{a}] {{\n"
+                ));
+            }
+            s.push_str(&format!(
+                "let prob=f32x4_splat(scores[{a}*kn+j]*inverse[{a}]);\n"
+            ));
+            for d in 0..16 {
+                s.push_str(&format!(
+                    "s{a}_{d}=f32x4_add(s{a}_{d},f32x4_mul(prob,v{d}));\n"
+                ));
+            }
+            if guarded {
+                s.push_str("}\n");
+            }
+        }
+        s.push_str("}};}\n");
     }
-    s.push_str("}\n");
+    // For four overlapping monotonic windows, only the short prefixes and
+    // suffixes need per-row masking. Partial or disjoint groups use the old
+    // guarded path. The three ranges remain in increasing key order.
+    s.push_str("if count==4 && first[3]<=last[0] {for j in first[0]..first[3] {guarded_rows!(j);}for j in first[3]..last[0] {all_rows!(j);}for j in last[0]..last[3] {guarded_rows!(j);}}else{for j in first[0]..last[count-1] {guarded_rows!(j);}}\n");
     for a in 0..4 {
         s.push_str(&format!(
             "if {a}<count {{let dst=out.as_mut_ptr().add({a}*H+h*D);\n"
@@ -439,7 +457,8 @@ fn score_four13(q:&[f32],qstride:usize,k:&[i16],scales:&[f32],head:usize,heads:u
     let mut quant=[0i16;256];let mut qs=[1e-12f32;4];let mut maximum=[f32::NEG_INFINITY;4];
     for a in 0..count {qs[a]=quant13(&q[a*qstride..a*qstride+D],&mut quant[a*D..(a+1)*D]);}
     // SAFETY: complete quantized heads and monotonic key windows were checked
-    // above. Each i32 lane sums <=16*8191^2; widen before combining the lanes.
+    // above. Each lane is bounded by 16*8191^2; pairing two lanes fits i32,
+    // and the final addition is widened to i64.
     unsafe {
 "#,
     );
@@ -451,19 +470,110 @@ fn score_four13(q:&[f32],qstride:usize,k:&[i16],scales:&[f32],head:usize,heads:u
             ));
         }
     }
-    s.push_str("for j in first[0]..last[count-1] {let key=k.as_ptr().add(j*heads*64+head*64);let ks=scales[j*heads+head];\n");
-    for d in 0..8 {
-        s.push_str(&format!("let k{d}=v128_load(key.add({}).cast());\n", d * 8));
-    }
-    for a in 0..4 {
-        s.push_str(&format!("let mut sum{a}=i32x4_dot_i16x8(q{a}_0,k0);\n"));
-        for d in 1..8 {
-            s.push_str(&format!(
-                "sum{a}=i32x4_add(sum{a},i32x4_dot_i16x8(q{a}_{d},k{d}));\n"
-            ));
+    for (name, guarded) in [("all_scores", false), ("guarded_scores", true)] {
+        s.push_str(&format!("macro_rules! {name} {{($key_index:expr)=>{{{{let j=$key_index;let key=k.as_ptr().add(j*heads*64+head*64);let ks=scales[j*heads+head];\n"));
+        for d in 0..8 {
+            s.push_str(&format!("let k{d}=v128_load(key.add({}).cast());\n", d * 8));
         }
-        s.push_str(&format!("if {a}<count && j>=first[{a}] && j<last[{a}] {{let total=i32x4_extract_lane::<0>(sum{a})as i64+i32x4_extract_lane::<1>(sum{a})as i64+i32x4_extract_lane::<2>(sum{a})as i64+i32x4_extract_lane::<3>(sum{a})as i64;let score=total as f32*(qs[{a}]*ks)*0.125;scores[{a}*kn+j]=score;maximum[{a}]=maximum[{a}].max(score);}}\n"));
+        for a in 0..4 {
+            s.push_str(&format!("let mut sum{a}=i32x4_dot_i16x8(q{a}_0,k0);\n"));
+            for d in 1..8 {
+                s.push_str(&format!(
+                    "sum{a}=i32x4_add(sum{a},i32x4_dot_i16x8(q{a}_{d},k{d}));\n"
+                ));
+            }
+            if guarded {
+                s.push_str(&format!(
+                    "if {a}<count && j>=first[{a}] && j<last[{a}] {{\n"
+                ));
+            }
+            // Two lanes contain at most 32*8191^2 = 2_146_959_392,
+            // below i32::MAX. Their final sum can exceed i32::MAX.
+            s.push_str(&format!("let pair=i32x4_add(sum{a},i32x4_shuffle::<2,3,0,1>(sum{a},sum{a}));let total=i32x4_extract_lane::<0>(pair)as i64+i32x4_extract_lane::<1>(pair)as i64;let score=total as f32*(qs[{a}]*ks)*0.125;scores[{a}*kn+j]=score;maximum[{a}]=maximum[{a}].max(score);\n"));
+            if guarded {
+                s.push_str("}\n");
+            }
+        }
+        s.push_str("}};}\n");
     }
-    s.push_str("}}maximum}\n");
+    // The middle interval is valid for every row; keep masking for the edges
+    // and incomplete groups so that local Attention windows are unchanged.
+    s.push_str("if count==4 && first[3]<=last[0] {for j in first[0]..first[3] {guarded_scores!(j);}for j in first[3]..last[0] {all_scores!(j);}for j in last[0]..last[3] {guarded_scores!(j);}}else{for j in first[0]..last[count-1] {guarded_scores!(j);}}\n");
+    s.push_str("}maximum}\n");
     s
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn shared_key_intervals_preserve_every_row_window_and_order() {
+        for tokens in 2usize..=256 {
+            for start in (0..tokens).step_by(4) {
+                let count = (tokens - start).min(4);
+                for global in [false, true] {
+                    let mut first = [0; 4];
+                    let mut last = [0; 4];
+                    for a in 0..count {
+                        (first[a], last[a]) = if global {
+                            (0, tokens)
+                        } else {
+                            ((start + a).saturating_sub(64), (start + a + 65).min(tokens))
+                        };
+                    }
+                    let mut actual: [Vec<usize>; 4] = std::array::from_fn(|_| Vec::new());
+                    let mut guarded = |begin, end| {
+                        for j in begin..end {
+                            for a in 0..count {
+                                if j >= first[a] && j < last[a] {
+                                    actual[a].push(j);
+                                }
+                            }
+                        }
+                    };
+                    if count == 4 && first[3] <= last[0] {
+                        guarded(first[0], first[3]);
+                        // End the closure's mutable borrow before the common path.
+                        for j in first[3]..last[0] {
+                            for row in &mut actual {
+                                row.push(j);
+                            }
+                        }
+                        for j in last[0]..last[3] {
+                            for a in 0..count {
+                                if j >= first[a] && j < last[a] {
+                                    actual[a].push(j);
+                                }
+                            }
+                        }
+                    } else {
+                        guarded(first[0], last[count - 1]);
+                    }
+                    for a in 0..count {
+                        assert_eq!(actual[a], (first[a]..last[a]).collect::<Vec<_>>());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn qk_lane_pairing_is_exact_at_integer_extremes() {
+        const LANE_MAX: i32 = 16 * 8191 * 8191;
+        assert_eq!(i64::from(LANE_MAX) * 2, 2_146_959_392);
+        assert!(i64::from(LANE_MAX) * 2 <= i64::from(i32::MAX));
+        for a in [-LANE_MAX, 0, LANE_MAX] {
+            for b in [-LANE_MAX, 0, LANE_MAX] {
+                for c in [-LANE_MAX, 0, LANE_MAX] {
+                    for d in [-LANE_MAX, 0, LANE_MAX] {
+                        let pair0 = a.checked_add(c).unwrap();
+                        let pair1 = b.checked_add(d).unwrap();
+                        assert_eq!(
+                            i64::from(pair0) + i64::from(pair1),
+                            i64::from(a) + i64::from(b) + i64::from(c) + i64::from(d)
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

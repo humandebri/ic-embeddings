@@ -98,10 +98,23 @@ fn read_fixture(path: &str, expected: &str) -> Vec<u8> {
     data
 }
 
+fn expected_new_runtime(verify_linear_i8: bool) -> &'static str {
+    if verify_linear_i8 {
+        "bekko25-runtime-3"
+    } else {
+        bekko25_core::RUNTIME_ID
+    }
+}
+
 fn main() {
-    // The same lifecycle and bit-exact sweep also verifies the subsequent
-    // INT8-resident linear-weight optimization against runtime 2.
+    // The same lifecycle and bit-exact sweep also verifies later runtime-only
+    // optimizations against their respective previous versions.
     let verify_linear_i8 = std::env::var("BEKKO25_VERIFY_LINEAR_I8").as_deref() == Ok("1");
+    let verify_attention = std::env::var("BEKKO25_VERIFY_ATTENTION").as_deref() == Ok("1");
+    assert!(
+        !(verify_linear_i8 && verify_attention),
+        "select only one runtime verification mode"
+    );
     let old = fs::read(std::env::var("BEKKO25_BASELINE_WASM").expect("baseline Wasm path"))
         .expect("read baseline Wasm");
     let new =
@@ -166,7 +179,9 @@ fn main() {
     assert_eq!(initial.embedding_space, bekko25_core::EMBEDDING_SPACE);
     assert_eq!(
         initial.runtime_id,
-        if verify_linear_i8 {
+        if verify_attention {
+            "bekko25-runtime-3"
+        } else if verify_linear_i8 {
             "bekko25-runtime-2"
         } else {
             "bekko25-runtime-1"
@@ -289,7 +304,10 @@ fn main() {
             && after_upgrade.uploaded_bytes == pack.len() as u64
     );
     assert_eq!(after_upgrade.embedding_space, initial.embedding_space);
-    assert_eq!(after_upgrade.runtime_id, bekko25_core::RUNTIME_ID);
+    assert_eq!(
+        after_upgrade.runtime_id,
+        expected_new_runtime(verify_linear_i8)
+    );
     let stranger = Principal::self_authenticating(b"stream-test-not-controller");
     for method in ["activate", "beginUpload"] {
         let denied = pic
@@ -327,7 +345,12 @@ fn main() {
     );
     let before_heap = memory_bytes(&before.memory_metrics.wasm_memory_size);
     let after_heap = memory_bytes(&after.memory_metrics.wasm_memory_size);
-    if verify_linear_i8 {
+    if verify_attention {
+        assert!(
+            after_heap <= before_heap.saturating_add(1_048_576),
+            "attention optimization increased heap unexpectedly: {before_heap} -> {after_heap}"
+        );
+    } else if verify_linear_i8 {
         assert!(
             before_heap
                 .checked_sub(after_heap)
@@ -419,6 +442,12 @@ mod tests {
             tokens: 2,
             instructions: 1,
         }
+    }
+
+    #[test]
+    fn linear_weight_regression_accepts_its_historical_target_runtime() {
+        assert_eq!(expected_new_runtime(true), "bekko25-runtime-3");
+        assert_eq!(expected_new_runtime(false), bekko25_core::RUNTIME_ID);
     }
 
     #[test]

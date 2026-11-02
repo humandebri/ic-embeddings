@@ -64,7 +64,7 @@ Both query and document vectors must have the same `embedding_space`:
 bekko-a25m-44f0b8af-w8a8-bf16kv-qk13-v1
 ```
 
-Store that ID with the document index and reject query vectors from another space. Rebuild the index when the model/revision or numerical semantics change; equal vector dimensions are insufficient. Bit-equivalent runtime optimizations keep the space ID. `runtime_id` identifies the implementation separately: `bekko25-runtime-3` reads vocabulary rows from stable memory and keeps linear weights as INT8 in Wasm heap.
+Store that ID with the document index and reject query vectors from another space. Rebuild the index when the model/revision or numerical semantics change; equal vector dimensions are insufficient. Bit-equivalent runtime optimizations keep the space ID. `runtime_id` identifies the implementation separately: `bekko25-runtime-4` reads vocabulary rows from stable memory, keeps linear weights as INT8 in Wasm heap, and optimizes shared Attention key windows.
 
 For RAG, split documents by sentences/paragraphs before tokenization, with up to 254 body tokens plus BOS/EOS and a modest overlap such as 32 source tokens. Use the same pinned tokenizer for both sides. The CLI refuses oversized inputs; the server rejects oversized vectors, missing framing, PAD 0 and out-of-vocabulary IDs. It never silently truncates. A lower chunk limit is available to the client without changing the embedding space, but changing document chunks requires re-embedding those chunks. Search normalized vectors by dot product/cosine and deduplicate parent documents after taking each parent's best chunk score.
 
