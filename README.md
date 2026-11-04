@@ -17,7 +17,7 @@
 | Bekko a8m | 軽量な多言語モデル。独自 canister を構築・検証 | 256 tokens／1 query | [モデルと利用手順](docs/BEKKO.md) |
 | Granite Small English R2 | 英語向けのローカル PoC | 通常 API は 1,365 tokens、追加クライアントは 5,000 tokens | [API とクライアント](docs/API.md)、[分割クライアント](docs/SHARDED.md) |
 
-各上限には BOS/EOS や CLS/SEP などの特殊 token を含みます。モデルや量子化方式ごとに embedding の空間は異なります。同じ検索インデックスには、同じモデル・同じ `embedding_space` で作った文書と検索クエリのベクトルを保存してください。
+各上限には BOS/EOS や CLS/SEP などの特殊 token を含みます。モデルや量子化方式ごとに embedding の空間は異なります。同じ検索インデックスには、同じモデル・同じ数値仕様で作った文書と検索クエリのベクトルを保存してください。Bekko a25m は応答の `embedding_space` で識別できます。Bekko a8m と Granite はこのフィールドを返さないため、利用側でモデルを識別してください。
 
 ## 公開 Bekko a25m を試す
 
