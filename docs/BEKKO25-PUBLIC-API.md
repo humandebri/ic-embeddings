@@ -55,16 +55,17 @@ icp canister call xrg4h-oiaaa-aaaal-qxrya-cai embed \
 
 検索クエリと検索対象の文書は、どちらも同じ tokenizer と `embed` を使います。Bekko は `query:` や `passage:` などの接頭辞を必要としません（[モデルの説明](https://huggingface.co/hotchpotch/bekko-embedding-v1-a25m/blob/44f0b8af0f487acd0ccf1a7cb7ae7a29a6dfc09c/README.md)）。文書のベクトルを保存し、検索時にクエリのベクトルとの類似度を比較します。ベクトルの保存と検索は利用するアプリ側で行います。
 
-## JavaScript / Node.js から呼ぶ
+## Node.js から呼ぶ
 
-アプリ側に [ICP JavaScript SDK](https://js.icp.build/core/latest/libs/agent/) をインストールします。以下は Node.js 24 と `@icp-sdk/core` 6.1.1 で確認した、`embed` のみの最小 Candid 定義です。実アプリでは上記の `.did` から型付き binding を生成することもできます。
+アプリ側に [ICP JavaScript SDK](https://js.icp.build/core/latest/libs/agent/) と [Transformers.js](https://huggingface.co/docs/transformers.js/en/api/tokenizers) をインストールします。以下は Node.js 24、`@icp-sdk/core` 6.1.1、`@huggingface/transformers` 4.3.2 で確認した、文章の token 化から `embed` までの例です。初回は固定 revision の tokenizer データを取得します。モデル重みはダウンロードしません。
 
 ```sh
-npm install @icp-sdk/core@6.1.1
+npm install @icp-sdk/core@6.1.1 @huggingface/transformers@4.3.2
 ```
 
 ```js
 import { Actor, HttpAgent } from '@icp-sdk/core/agent';
+import { AutoTokenizer } from '@huggingface/transformers';
 
 const idlFactory = ({ IDL }) => {
   const Embedding = IDL.Record({
@@ -89,23 +90,44 @@ const actor = Actor.createActor(idlFactory, {
   canisterId: 'xrg4h-oiaaa-aaaal-qxrya-cai',
 });
 
-// 「インターネットコンピューターの検索」を上記 tokenizer で変換した例。
-// 実際の入力では、利用するテキストごとに同じ revision で token 化します。
-const tokenIds = [2, 23908, 6352, 29273, 184527, 6352, 235372, 46302, 1];
+const tokenizer = await AutoTokenizer.from_pretrained(
+  'hotchpotch/bekko-embedding-v1-a25m',
+  { revision: '44f0b8af0f487acd0ccf1a7cb7ae7a29a6dfc09c' },
+);
+const text = process.argv.length > 2
+  ? process.argv.slice(2).join(' ')
+  : 'インターネットコンピューターの検索';
+const { input_ids } = await tokenizer(text, {
+  add_special_tokens: true,
+  truncation: false,
+  padding: false,
+});
+const tokenIds = Array.from(input_ids.data, Number);
+if (tokenIds.length < 2 || tokenIds.length > 256) {
+  throw new Error(`${tokenIds.length} tokens including BOS/EOS; split the text`);
+}
+if (tokenIds[0] !== 2 || tokenIds[tokenIds.length - 1] !== 1 || tokenIds.includes(0)) {
+  throw new Error('expected unpadded BOS ... EOS input');
+}
 const result = await actor.embed(tokenIds);
 if ('Err' in result) throw new Error(result.Err);
 
 const { embedding, embedding_space, tokens, instructions } = result.Ok;
-console.log({
-  dimensions: embedding.length, // 384
+console.log(JSON.stringify({
   embedding_space,
   tokens,
   instructions: instructions.toString(), // nat64 は bigint
-});
-// embedding を検索用のベクトルとして使用します。
+  embedding: Array.from(embedding), // 384 次元
+}, null, 2));
 ```
 
-上のコードを `example.mjs` に保存して `node example.mjs` で実行できます。`modelInfo` なども使う場合は、[Candid 定義](../crates/bekko25-canister/bekko25.did)から binding を生成するか、必要なメソッドを `idlFactory` に追加してください。
+上のコードを `example.mjs` に保存し、次のように文章を指定して実行できます。
+
+```sh
+node example.mjs '検索したい文章'
+```
+
+tokenizer と `agent` は、複数の文章を処理するアプリでは再利用できます。例は `embed` のみの最小 Candid 定義です。`modelInfo` なども使う場合は、[Candid 定義](../crates/bekko25-canister/bekko25.did)から binding を生成するか、必要なメソッドを `idlFactory` に追加してください。
 
 ## 利用時の注意
 
