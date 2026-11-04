@@ -1,137 +1,69 @@
 # ICP embedding canisters
 
-## 公開中の Bekko a25m を使う
+[![Rust checks](https://github.com/humandebri/ic-granite-embedding/actions/workflows/ci.yml/badge.svg)](https://github.com/humandebri/ic-granite-embedding/actions/workflows/ci.yml)
 
-多言語モデル **Bekko a25m INT8 compact** を ICP mainnet で公開しています。以下の query は匿名を含め誰でも呼び出せます。
+文章を検索しやすいベクトルに変換する、Internet Computer（ICP）向けの canister 実装です。テキストを呼び出し側で token ID に変換し、canister が embedding を計算します。
 
-- Canister ID: `xrg4h-oiaaa-aaaal-qxrya-cai`
-- `modelInfo()`：モデルの稼働状態と設定を取得
-- `embed(vec nat32)`：token ID を受け取り、384次元の正規化済み embedding を返す
-- 入力：BOS・EOS を含め最大256 tokens。テキストの token 化は呼び出し側で行います。
+```text
+文章 → クライアントの tokenizer → token ID → canister の embed → ベクトル
+```
 
-まず [icp CLI](https://dfinity.github.io/icp-cli/) をインストールし、状態を確認できます。
+## 利用できるモデル
+
+| モデル | 状態・用途 | 入力上限 | 詳細 |
+| --- | --- | --- | --- |
+| **Bekko a25m INT8 compact** | 多言語検索向け。mainnet に公開中 | 256 tokens／1 query | [公開 API 利用ガイド](docs/BEKKO25-PUBLIC-API.md) |
+| Bekko a25m F32 語彙版 | 独自 canister を構築・運用する場合 | 256 tokens／1 query | [運用ガイド](docs/BEKKO25.md) |
+| Bekko a8m | 軽量な多言語モデル。独自 canister を構築・検証 | 256 tokens／1 query | [モデルと利用手順](docs/BEKKO.md) |
+| Granite Small English R2 | 英語向けのローカル PoC | 通常 API は 1,365 tokens、追加クライアントは 5,000 tokens | [API とクライアント](docs/API.md)、[分割クライアント](docs/SHARDED.md) |
+
+各上限には BOS/EOS や CLS/SEP などの特殊 token を含みます。モデルや量子化方式ごとに embedding の空間は異なります。同じ検索インデックスには、同じモデル・同じ数値仕様で作った文書と検索クエリのベクトルを保存してください。Bekko a25m は応答の `embedding_space` で識別できます。Bekko a8m と Granite はこのフィールドを返さないため、利用側でモデルを識別してください。
+
+## 公開 Bekko a25m を試す
+
+mainnet の **`xrg4h-oiaaa-aaaal-qxrya-cai`** は、匿名を含め誰でも利用できます。API キーやモデル重みのアップロードは不要です。
+
+[icp CLI](https://dfinity.github.io/icp-cli/) をインストールし、モデルの状態を確認します。
 
 ```sh
 icp canister call xrg4h-oiaaa-aaaal-qxrya-cai modelInfo '()' \
   --query --network ic --identity anonymous
 ```
 
-日本語テキストの token 化から `embed` の呼び出し、JavaScript からの利用例、入力・返り値・注意点は **[公開 API 利用ガイド](docs/BEKKO25-PUBLIC-API.md)** を参照してください。モデル重みのダウンロードや controller 権限は利用者には不要です。
-
-以下の Granite の説明は、上記の Bekko 公開 canister とは別の実装です。
-
-## Granite の概要
-
-[Granite Embedding Small English R2](https://huggingface.co/ibm-granite/granite-embedding-small-english-r2)をInternet Computerのqueryで実行する、固定モデル向けのRust/Wasm実装です。
-INT8重みと動的INT8活性値（W8A8）を使い、CLS pooling・L2正規化済みの384次元embeddingを返します。
-入力全体を参照して全12層を実行し、独立した短文embeddingの平均で全文推論を代用しません。
-
-**通常APIは304 tokensまで1 query、1,365 tokensを7 queryで処理します。追加の分割クライアントは5,000 tokensを161 queryで処理します。**
-長さには先頭CLSと末尾SEPを含みます。通常の推論はすべてqueryで、モデルのロードだけcontroller用updateを使います。
-
-- [API・モデルのロード・クライアント例](docs/API.md)
-- [ビルド・参照データ生成・検証・profiling](docs/DEVELOPMENT.md)
-- [5,000 tokensの分割クライアント](docs/SHARDED.md)
-- [最新の性能・検証](benchmarks/query-fusion/RESULTS.md) / [計測の履歴](benchmarks/README.md)
-
-多言語の **Bekko a8mを256 tokens・1 queryで使う専用canister** も追加しています。[Bekkoの起動・API・検証結果](docs/BEKKO.md)を参照してください。
-
-[EmbeddingGemma 2の比較実験](benchmarks/embeddinggemma2/RESULTS.md)では、日英の検索精度と全24層のcanister実行を測定しています。
-[英語中心の6言語比較](benchmarks/multilingual-global/RESULTS.md)では、アラビア語を含む検索精度、Bekko a25mの1 query、Gemma 2の分割queryを比較しています。
-[Bekko a25mのランタイム改善](benchmarks/bekko25-runtime/RESULTS.md)では、追加のQK量子化を含む実験版で256 tokens・1 query（約49.22億命令）を確認しています。精度差と上限までの余裕も記録しています。
-[Bekko a25m F32語彙版の運用手順](docs/BEKKO25.md)では、専用canister・再開可能なローダー・アップグレードを説明しています。F32語彙版のローカル検証では256 tokensが最大約48.33億命令、全入力長の最大が約48.44億命令でした。[全入力長と実Wasm検索の検証](benchmarks/bekko25-operations/RESULTS.md)も行っています。
-[Bekko a25mを検討した理由](docs/BEKKO-MODEL-SELECTION.md)には、a8m・multilingual-e5-smallとの比較と判断上の限界をまとめています。
-
-## 対応する入力長
-
-| 入力tokens（CLS/SEP込み） | query数 | 実行する層数の分割 |
-| --- | ---: | --- |
-| 2〜304 | 1 | `[12]` |
-| 305〜512 | 2 | `[5, 7]` |
-| 513〜768 | 4 | `[3, 3, 3, 3]` |
-| 769〜1,024 | 5 | `[2, 2, 2, 2, 4]` |
-| 1,025〜1,365 | 7 | `[1, 2, 1, 2, 1, 2, 3]` |
-
-各planは合計12層です。複数queryでは、返された中間stateをクライアントが次のqueryへ渡します。
-1 queryの境界を複数入力で測定し、公開上限は304にしています。境界での成功・失敗は[最新の性能レポート](benchmarks/query-fusion/RESULTS.md)を参照してください。
-`startEmbedding`は1,365を超える入力を拒否し、暗黙に切り捨てません。1,366〜5,000 tokensは[分割query経路](docs/SHARDED.md)を使います。
-
-1,365 tokensの最大requestは2,096,674 bytesでした。
-1,366 tokensでは中間stateのF32値だけで2,098,176 bytesとなり、2 MiBを超えます。
-この上限は現在のstate転送形式に対するもので、モデル自体の最大長を示す値ではありません。
-
-## ローカル実測と検証
-
-2026-10-27、PocketIC server 11.0.0、Application subnet / Productionで測定しました。
-実際の50億命令/queryの上限を適用し、Benchmarking設定による緩和はしていません。
-
-| tokens | query数 | 合計命令 | 最大/query |
-| --- | ---: | ---: | ---: |
-| 256 | 1 | 4,064,748,620 | 4,064,748,620 |
-| 304 | 1 | 4,884,221,016 | 4,884,221,016 |
-| 512 | 2 | 8,351,268,853 | 4,431,648,644 |
-| 768 | 4 | 13,293,671,842 | 4,222,022,185 |
-| 1,024 | 5 | 18,640,233,102 | 4,353,733,502 |
-| 1,365 | 7 | 26,670,559,915 | 4,322,917,417 |
-| 5,000（分割client） | 161 | 164,741,174,056 | 2,628,934,924 |
-
-304 tokensは固定seedの走査入力、ほかはtokenizerで生成した文書です。
-5,000 tokensの順次1回比較では、前版19.05秒・今回18.85秒でした。
-速度差の再現性は未検証で、OS・熱状態も未制御です。mainnetのレイテンシを示す値ではありません。
-5,000 tokensの転送はCandid request/reply合計約513 MBです。
-
-旧入力域2〜512の全511長は前版と出力がbit単位で一致しました。分割clientの境界54ケースと、680行replyの上限2ケースも照合しています。
-長文は32長×3入力の96ケースとFP32参照11ケースを検証し、長文参照との最小cosineは0.999592611でした。
-これは検索のRecall@kなどを測ったretrieval benchmarkではありません。
-5,000 tokensは4文書を検証し、FP32との最小cosineは0.999508387でした。最新のソース・Wasm・分割方式は[性能レポート](benchmarks/query-fusion/RESULTS.md)にまとめています。
-
-## ビルドして使う
-
-Rustは[rust-toolchain.toml](rust-toolchain.toml)で1.97.1に固定しています。リポジトリのルートで実行します。
+次は BOS と EOS のみで `embed` を呼ぶ動作確認です。成功すると `Ok` の中に 384 次元の `embedding` が返ります。
 
 ```sh
-cargo build --release --locked -p granite-canister --target wasm32-unknown-unknown
+icp canister call xrg4h-oiaaa-aaaal-qxrya-cai embed \
+  '(vec { 2 : nat32; 1 : nat32 })' \
+  --query --network ic --identity anonymous
 ```
 
-出力は`target/wasm32-unknown-unknown/release/granite_canister.wasm`です。
-Wasmに重みは含めていません。利用するには次の順で準備します。
+これは空入力のテストです。実際の文章を使う場合は、クライアントで固定 revision の tokenizer を実行してから token ID を送ります。**[公開 API 利用ガイド](docs/BEKKO25-PUBLIC-API.md)** に Python と JavaScript（Node.js）で文章を token 化して呼び出す手順、戻り値、エラー、入力制限をまとめています。
 
-1. [参照データの準備手順](docs/DEVELOPMENT.md#モデルと参照データを準備する)で`.cache/model.pack`を生成する。
-2. 利用先にWasmをインストールし、controllerとして`upload`と`activate`を呼ぶ。
-3. 固定revisionのtokenizerでID列を作り、`startEmbedding`から開始する。
+検索クエリと文書は、同じ tokenizer と `embed` で変換できます。ベクトルの保存と類似検索は利用するアプリ側で行います。通常の query 応答はアプリ独自の certified data を持ちません。
 
-モデルのロードと推論の呼び出し例は[APIドキュメント](docs/API.md)を参照してください。
-デプロイ先の作成・identity設定は利用側で用意します。付属の検証ハーネスは専用のPocketIC環境を作成し、ロードからqueryまで実行します。
+## 自分で構築・運用する
 
-## 実装の構成
+各モデルには別々の canister と API があります。
 
-| パス | 役割 |
-| --- | --- |
-| [crates/core](crates/core) | 固定モデルのloader、W8A8計算、Attention、query plan、state codec |
-| [crates/core/build.rs](crates/core/build.rs) | 固定形状のWasm SIMD kernel生成 |
-| [crates/canister](crates/canister) | controller用ロードAPIとquery API |
-| [crates/canister/granite.did](crates/canister/granite.did) | 通常ビルドのCandid |
-| [crates/bench](crates/bench) | native参照・PocketIC検証・計測ハーネス |
-| [scripts](scripts) | 重みexport、FP32/INT8参照生成、検証、profile集計 |
-| [benchmarks](benchmarks/README.md) | 段階別の測定記録と検証データ |
+- **Bekko a25m INT8 compact**：[ビルド・重みの準備・検証・移行](docs/BEKKO25-COMPACT.md)
+- **Bekko a25m F32 語彙版**：[ビルド・利用・アップグレード](docs/BEKKO25.md)
+- **Bekko a8m**：[ビルド・利用・検証](docs/BEKKO.md)
+- **Granite Small English R2**：[API と重みのロード](docs/API.md)、[開発手順](docs/DEVELOPMENT.md)、[長文の分割クライアント](docs/SHARDED.md)
 
-重みのINT8化はオフラインで行い、i16展開・Strassen用の重み和差・RoPEのsin/cosは`activate`で準備します。
-入力に依存する活性値の量子化はquery中に行います。
-QKV・Attention出力・Wi・Woには整数で復元する1段Strassenを使い、長文AttentionのAVは512-keyブロックをi32で計算してi64で合算します。
-GELU近似やK/VのBF16丸めを含む数値仕様・feature構成は[開発ドキュメント](docs/DEVELOPMENT.md#数値仕様とfeature)に記載しています。
+各 canister はモデル重みを Wasm に含めません。独自に配備する場合は、対象モデルのガイドに従って重みを準備・ロードしてください。
+このリポジトリの [mainnet ID 対応](.icp/data/mappings/ic.ids.json)は公開中の Bekko a25m compact を指します。mainnet への配備は既存 canister に影響するため、ローカルでの構築・検証と区別してください。
 
-## 現在の範囲
+## 計測とモデル選定
 
-この節の Granite 実装はローカルPoCで、mainnetにはデプロイしていません。上記の Bekko a25m 公開 canister は別です。
-重みはheapに保持するため、upgrade後の復元手順・永続化は未実装です。ブラウザSDKやcanister内tokenizerも含みません。
-query結果とクライアントが返すstateに、replicated consensusや改変防止の保証はありません。
-stateは推論ごとに分け、モデルやmoduleの更新をまたいで再利用しないでください。
+性能値はモデル・入力長・実行環境によって異なります。本番の限界値を単一の計測から保証することはできません。
 
-`startEmbedding` / `continueEmbedding`の対応上限は1,365です。追加の[分割クライアント](docs/SHARDED.md)は`step`を使い、5,000 tokensを処理します。
-[初版の687 query](benchmarks/RESULTS.md)から、現在は161 queryへ削減しました。
+- [Bekko a25m compact の実測と本番 upgrade 検証](benchmarks/bekko25-compact/RESULTS.md)
+- [Bekko a25m を検討した理由と比較上の限界](docs/BEKKO-MODEL-SELECTION.md)
+- [多言語検索の比較](benchmarks/multilingual-global/RESULTS.md)
+- [Granite の性能・長文検証](benchmarks/query-fusion/RESULTS.md)
+- [すべての計測記録](benchmarks/README.md)
 
-## 参照
+## ライセンス
 
-- [固定model revision](https://huggingface.co/ibm-granite/granite-embedding-small-english-r2/tree/2ab6fa8ea2d674564defd37171ae19079b864b33)
-- [参考にしたic-imajev](https://github.com/humandebri/ic-imajev)
-- [初回の設計調査](FEASIBILITY.md)（履歴）
+このリポジトリのソースコードは [MIT License](LICENSE) で提供します。モデルの重みや評価用データには、それぞれの提供元の利用条件が適用されます。
