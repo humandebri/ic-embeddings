@@ -112,7 +112,7 @@ console.log({
 - 入力 ID は `0` の padding を含めず、モデルの語彙範囲内である必要があります。canister は文字列を直接受け取らず、tokenizer を内蔵していません。
 - 文書と検索クエリには同じ tokenizer と `embedding_space` を使ってください。F32 語彙表版や a8m は別の空間なので、同じ検索インデックスに混ぜないでください。
 - query 結果にアプリ独自の certified data は付いていません。通常の query は単一 replica で実行され、update のような consensus による検証はありません。[ICP の認証付きデータの説明](https://docs.internetcomputer.org/guides/security/data-integrity-and-authenticity/)も参照してください。
-- [ICP の query 上限](https://docs.internetcomputer.org/references/resource-limits/)は 1 回あたり 50 億命令です。現在の本番版は 255 tokens の実測で最大約 49.54 億命令に達しており、最大長付近の全入力が成功する保証はありません。長い入力では余裕を持って分割してください。最適化版は mainnet 未適用です。[測定結果](../benchmarks/bekko25-compact/RESULTS.md#attention-instruction-headroom)を参照してください。
+- [ICP の query 上限](https://docs.internetcomputer.org/references/resource-limits/)は 1 回あたり 50 億命令です。2026-11-04 に最適化版へ更新し、255〜256 tokens を含む8入力の本番実測では、推論処理内の最大は約 48.47 億命令でした。これはサンプルであり、query 全体のコストや全入力の成功を保証するものではありません。長い入力は余裕を持って分割してください。[測定結果](../benchmarks/bekko25-compact/RESULTS.md#mainnet-upgrade-validation)を参照してください。
 - [通常の query 自体に cycles は課金されません](https://docs.internetcomputer.org/concepts/cycles/)が、canister の保存や運用には cycles が必要で、利用可能性は運用状態に依存します。負荷が高い場合は遅延や失敗が起こりえます。
 - `beginUpload`・`upload`・`activate` は管理者専用の update です。利用者が呼び出す必要はありません。
 

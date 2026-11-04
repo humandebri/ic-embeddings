@@ -54,4 +54,23 @@ The F32-vocabulary a25m canister was independently upgraded from runtime 3 to ru
 
 The standard PocketIC 11 compact release verifier and independent provenance report also passed all 475 inputs against the F32 baseline. On the 50-question Japanese fixture, hits@1 were 42 -> 42 and hits@5 were 50 -> 50. The new compact maximum was 4,701,787,513 instructions in this environment; its heap and stable memory were 151,388,160 B and 124,518,400 B. This small retrieval fixture does not establish quality on other data.
 
-The old recipe SHA-256 is `e77802fd1943cccb9ec016fe6b42df4c5ad490d298337cb22f62d1481eb09729`; the new recipe SHA-256 is `e6ab7a0d507d8fd54cc2a724432afee73fafe8b435ce946244da224e49ccad64`. The compact pack SHA-256 remains `71b8c47a0a508dd5cd3e704d83934e900c8e634d2c52e7a02a85e882fa5be9c4`. Detailed output vectors remain local. The new recipe has not been measured on mainnet, so the local reductions are not a mainnet guarantee.
+The old recipe SHA-256 is `e77802fd1943cccb9ec016fe6b42df4c5ad490d298337cb22f62d1481eb09729`; the new recipe SHA-256 is `e6ab7a0d507d8fd54cc2a724432afee73fafe8b435ce946244da224e49ccad64`. The compact pack SHA-256 remains `71b8c47a0a508dd5cd3e704d83934e900c8e634d2c52e7a02a85e882fa5be9c4`. Detailed output vectors remain local. At the time of these measurements the new recipe had not yet been measured on mainnet; the subsequent checks are below.
+
+## Mainnet upgrade validation
+
+2026-11-04: canister `xrg4h-oiaaa-aaaal-qxrya-cai` was upgraded to the verified runtime-2 recipe above. The verified 124,516,506-byte compact pack and embedding-space ID were retained, and the controller reactivated the model. The live module hash matched the verified recipe. Before the mainnet upgrade, a disposable PocketIC 16 rehearsal also upgraded from the old recipe to the new recipe and back; after reactivation, all 14 sampled outputs matched the original bit-for-bit. No mainnet snapshot was created.
+
+All 384 components matched bit-for-bit for each of eight anonymous mainnet inputs queried immediately before and after the upgrade. The observed `embed` body counters were:
+
+| Input | Before | After | Reduction |
+| --- | ---: | ---: | ---: |
+| en-128 | 2,340,432,264 | 2,305,486,725 | 34,945,539 |
+| en-192 | 3,610,240,853 | 3,543,540,937 | 66,699,916 |
+| en-255 | 4,952,649,977 | 4,845,947,513 | 106,702,464 |
+| en-256 | 4,940,935,000 | 4,832,583,602 | 108,351,398 |
+| ko-255 | 4,953,609,977 | 4,846,907,513 | 106,702,464 |
+| ko-256 | 4,941,895,000 | 4,833,543,602 | 108,351,398 |
+| repeat-3-255 | 4,951,929,977 | 4,845,227,513 | 106,702,464 |
+| repeat-3-256 | 4,940,215,000 | 4,831,863,602 | 108,351,398 |
+
+The maximum in this sample was 4,846,907,513, below the 4.9B sampling target. The returned counter covers the embed body; these eight cases do not establish an upper bound for all inputs or the total message cost. Detailed vectors remain local. Immediately after activation, status was Running with 279,800,927 bytes of memory, 1,190,166,914,047 execution cycles, no reserved cycles, and 8,012,365,517 idle cycles burned per day. These are point-in-time observations.
