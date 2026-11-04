@@ -1,4 +1,26 @@
-# Granite Small English R2 query canister
+# ICP embedding canisters
+
+## 公開中の Bekko a25m を使う
+
+多言語モデル **Bekko a25m INT8 compact** を ICP mainnet で公開しています。以下の query は匿名を含め誰でも呼び出せます。
+
+- Canister ID: `xrg4h-oiaaa-aaaal-qxrya-cai`
+- `modelInfo()`：モデルの稼働状態と設定を取得
+- `embed(vec nat32)`：token ID を受け取り、384次元の正規化済み embedding を返す
+- 入力：BOS・EOS を含め最大256 tokens。テキストの token 化は呼び出し側で行います。
+
+まず [icp CLI](https://dfinity.github.io/icp-cli/) をインストールし、状態を確認できます。
+
+```sh
+icp canister call xrg4h-oiaaa-aaaal-qxrya-cai modelInfo '()' \
+  --query --network ic --identity anonymous
+```
+
+日本語テキストの token 化から `embed` の呼び出し、JavaScript からの利用例、入力・返り値・注意点は **[公開 API 利用ガイド](docs/BEKKO25-PUBLIC-API.md)** を参照してください。モデル重みのダウンロードや controller 権限は利用者には不要です。
+
+以下の Granite の説明は、上記の Bekko 公開 canister とは別の実装です。
+
+## Granite の概要
 
 [Granite Embedding Small English R2](https://huggingface.co/ibm-granite/granite-embedding-small-english-r2)をInternet Computerのqueryで実行する、固定モデル向けのRust/Wasm実装です。
 INT8重みと動的INT8活性値（W8A8）を使い、CLS pooling・L2正規化済みの384次元embeddingを返します。
@@ -17,7 +39,8 @@ INT8重みと動的INT8活性値（W8A8）を使い、CLS pooling・L2正規化�
 [EmbeddingGemma 2の比較実験](benchmarks/embeddinggemma2/RESULTS.md)では、日英の検索精度と全24層のcanister実行を測定しています。
 [英語中心の6言語比較](benchmarks/multilingual-global/RESULTS.md)では、アラビア語を含む検索精度、Bekko a25mの1 query、Gemma 2の分割queryを比較しています。
 [Bekko a25mのランタイム改善](benchmarks/bekko25-runtime/RESULTS.md)では、追加のQK量子化を含む実験版で256 tokens・1 query（約49.22億命令）を確認しています。精度差と上限までの余裕も記録しています。
-[Bekko a25mの運用手順](docs/BEKKO25.md)では、専用canister・再開可能なローダー・アップグレードを提供しています。配布版の256 tokensは最大約48.33億命令、全入力長の最大は約48.44億命令でした。[全入力長と実Wasm検索の検証](benchmarks/bekko25-operations/RESULTS.md)も行っています。
+[Bekko a25m F32語彙版の運用手順](docs/BEKKO25.md)では、専用canister・再開可能なローダー・アップグレードを説明しています。F32語彙版のローカル検証では256 tokensが最大約48.33億命令、全入力長の最大が約48.44億命令でした。[全入力長と実Wasm検索の検証](benchmarks/bekko25-operations/RESULTS.md)も行っています。
+[Bekko a25mを検討した理由](docs/BEKKO-MODEL-SELECTION.md)には、a8m・multilingual-e5-smallとの比較と判断上の限界をまとめています。
 
 ## 対応する入力長
 
@@ -99,7 +122,7 @@ GELU近似やK/VのBF16丸めを含む数値仕様・feature構成は[開発ド�
 
 ## 現在の範囲
 
-ローカルPoCで、mainnetにはデプロイしていません。
+この節の Granite 実装はローカルPoCで、mainnetにはデプロイしていません。上記の Bekko a25m 公開 canister は別です。
 重みはheapに保持するため、upgrade後の復元手順・永続化は未実装です。ブラウザSDKやcanister内tokenizerも含みません。
 query結果とクライアントが返すstateに、replicated consensusや改変防止の保証はありません。
 stateは推論ごとに分け、モデルやmoduleの更新をまたいで再利用しないでください。

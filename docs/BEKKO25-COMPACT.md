@@ -1,5 +1,7 @@
 # Bekko a25m compact canister
 
+For the public mainnet canister, anonymous query examples, tokenizer setup, and JavaScript integration, see the [public API guide](BEKKO25-PUBLIC-API.md).
+
 `bekko25_compact` is a separate canister and embedding space. It stores the token vocabulary as 256,000 independently readable signed INT8 rows, each with a little-endian F32 scale. Other model weights retain the existing quantization. The 384-dimensional result differs numerically from the F32-vocabulary canister; retrieval quality must be evaluated on the application's actual corpus. The two spaces must not share document or query vectors.
 
 The compact artifact is built from the same shared API implementation, with a distinct storage magic and pinned compact pack. It does not change the old canister's storage or API. An attempt to upgrade an existing F32 canister directly to the compact artifact rejects its old storage; it is not a migration. Existing stable memory cannot be shrunk by merely replacing the bytes. Use a new canister ID for the compact pack and retain the original until the new index has been verified and switched over.
