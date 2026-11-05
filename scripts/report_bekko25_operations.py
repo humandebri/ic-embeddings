@@ -15,7 +15,7 @@ OUT = ROOT / "benchmarks/bekko25-operations"
 # or evidence that regressions were checked for a subsequent build.
 HISTORICAL_REVISION = "0501a20f7ed42a6eb94829d56de12b38362dc24b"
 HISTORICAL_RECORDS = (
-    "https://github.com/humandebri/ic-granite-embedding/blob/"
+    "https://github.com/humandebri/ic-embeddings/blob/"
     f"{HISTORICAL_REVISION}/benchmarks/bekko25-operations"
 )
 

@@ -1,6 +1,6 @@
 # ICP embedding canisters
 
-[![Rust checks](https://github.com/humandebri/ic-granite-embedding/actions/workflows/ci.yml/badge.svg)](https://github.com/humandebri/ic-granite-embedding/actions/workflows/ci.yml)
+[![Rust checks](https://github.com/humandebri/ic-embeddings/actions/workflows/ci.yml/badge.svg)](https://github.com/humandebri/ic-embeddings/actions/workflows/ci.yml)
 
 文章を検索しやすいベクトルに変換する、Internet Computer（ICP）向けの canister 実装です。テキストを呼び出し側で token ID に変換し、canister が embedding を計算します。
 
