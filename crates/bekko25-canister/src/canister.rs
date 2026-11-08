@@ -229,4 +229,42 @@ fn model_info() -> ModelInfo {
             .or_else(|| state.err()),
     }
 }
+
+#[cfg(test)]
+mod refill_tests {
+    use super::*;
+    use candid::Principal;
+    #[test]
+    fn only_the_funding_wiki_may_read_the_update_balance() {
+        assert!(authorize_wiki_balance(Principal::from_text("6emaw-iyaaa-aaaay-aacka-cai").unwrap()).is_ok());
+        for caller in [Principal::anonymous(), Principal::management_canister(),
+            Principal::from_text("xrg4h-oiaaa-aaaal-qxrya-cai").unwrap(),
+            Principal::from_text("r75h6-lqd7b-5jack-at55d-vvti2-lg5qy-ly73a-5ezve-odnkc-kagu3-nae").unwrap()] {
+            assert!(authorize_wiki_balance(caller).is_err());
+        }
+    }
+}
+
+fn authorize_wiki_balance(caller: candid::Principal) -> Result<(), String> {
+    if caller == candid::Principal::from_text("6emaw-iyaaa-aaaay-aacka-cai")
+        .expect("fixed funding Wiki principal") {
+        Ok(())
+    } else {
+        Err("funding Wiki only".into())
+    }
+}
+
+/// Replicated read for the funding Wiki's timer. Never accepts or spends attached cycles.
+#[ic_cdk::update]
+fn cycles_balance_for_wiki() -> Result<u128, String> {
+    authorize_wiki_balance(ic_cdk::api::msg_caller())?;
+    Ok(ic_cdk::api::canister_cycle_balance())
+}
+
+#[cfg(test)]
+#[test]
+fn balance_update_is_in_exported_candid() {
+    assert!(__export_service().contains("cycles_balance_for_wiki : () -> ("));
+}
+
 ic_cdk::export_candid!();

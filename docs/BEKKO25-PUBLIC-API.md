@@ -139,3 +139,12 @@ tokenizer と `agent` は、複数の文章を処理するアプリでは再利�
 - `beginUpload`・`upload`・`activate` は管理者専用の update です。利用者が呼び出す必要はありません。
 
 canister の構築・重み・アップグレードは [compact 版の運用ガイド](BEKKO25-COMPACT.md)を参照してください。
+
+
+## Funding Wiki balance update
+
+`cycles_balance_for_wiki : () -> (variant { Ok : nat; Err : text })` is an **update** for inter-canister timer use. Only funding Wiki `6emaw-iyaaa-aaaay-aacka-cai` may call it; anonymous clients and even Bekko controllers receive `Err`. It returns the canister execution-cycle balance and does not change model state, accept cycles, or grant spending authority. The existing public `modelInfo`/`embed` query access is unchanged.
+
+This endpoint is shared by the standard and compact a25m packages; mainnet `xrg4h-oiaaa-aaaal-qxrya-cai` uses compact. The numeric model, stable weight header/layout, pinned pack SHA256, runtime and embedding-space IDs are unchanged. Use upgrade, then controller `activate`, and compare representative inference vectors before enabling any funding caller. A frozen Bekko cannot execute this update; controller status and external funding are required for recovery. Wiki keeps refill disabled by default and locks ambiguous deposits until controller reconciliation.
+
+The linked Wiki refill PR contains `pocketic-tests/integration/bekko-refill.test.mjs`, a cross-repository rehearsal using the old deployed compact Wasm, the new compact Wasm and pinned `model-int8.pack`. It checks 14 bit-identical before/after embeddings and the actual Wiki-to-Bekko deposit path. No mainnet operations are performed by this change.
