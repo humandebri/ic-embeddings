@@ -1,10 +1,10 @@
 # Granite Embedding Small English R2 の query canister 化
 
-> **履歴: 実装前の設計調査です。** 現在の仕様は[README](README.md)・[API](docs/API.md)、実測は[最新レポート](benchmarks/frontier/RESULTS.md)を参照してください。
-> このページの候補APIや推奨手順は当時の案です。後続で5,000 tokensを低水準に分割した実験と、現在の300 tokens / 1 query・1,365 tokens / 7 queryの公開APIをそれぞれ検証しました。
+> **過去の記録：実装前の設計調査です。** このページの API 案や推奨手順は当時のもので、現在の仕様ではありません。
+> 現在の Granite canister の仕様は [API](../API.md)、実測は [計測結果の一覧](../../benchmarks/README.md) を参照してください。
 
 調査日: 2026-10-26。対象は `ibm-granite/granite-embedding-small-english-r2`。
-ユーザーの希望に合わせ、通常の推論は query で提供する前提。
+通常の推論は query で提供する前提で検討した。
 
 ## 結論
 

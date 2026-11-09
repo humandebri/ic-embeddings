@@ -1,5 +1,7 @@
 # Bekko a25m canister
 
+> To call the public mainnet canister, see the [public API guide](BEKKO25-PUBLIC-API.md). This page is for building and operating your own F32-vocabulary canister.
+
 The dedicated `bekko25` canister accepts **2–256 token IDs including BOS (2) and EOS (1)**, executes all 13 layers and returns a normalized 384-dimensional vector in one query. It has a separate Wasm artifact, canister ID and stable-storage version from a8m. The a8m service remains available independently.
 
 For a smaller model footprint with an INT8 vocabulary, see the separate [compact canister and index migration guide](BEKKO25-COMPACT.md). Its embedding space differs from this F32-vocabulary service.

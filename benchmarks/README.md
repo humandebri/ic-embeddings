@@ -1,9 +1,34 @@
-# 計測結果の入口と履歴
+# 計測結果の一覧
 
-現在の公開API・default feature構成は、[README](../README.md)と[現在の実装の検証](query-fusion/RESULTS.md)を参照してください。
-下の履歴には、当時のquery plan・Wasm・転送形式・計測方法が含まれます。現在の上限として読み替えないでください。
+このディレクトリには、各モデルの性能・精度・運用検証の記録を保存しています。各記録は当時のソース・Wasm・計測条件での実測です。本番の上限や性能を保証するものではありません。現在の仕様は [ドキュメント一覧](../docs/README.md) を参照してください。
 
-## 最新の検証データ
+## Bekko a25m（公開 canister）
+
+| 記録 | 内容 |
+| --- | --- |
+| [bekko25-compact](bekko25-compact/RESULTS.md) | 公開中の INT8 compact 版。ローカル検証と mainnet upgrade 時の実測 |
+| [bekko25-operations](bekko25-operations/RESULTS.md) | F32 語彙版の運用検証。全入力長、アップロード、upgrade、検索精度 |
+| [bekko25-stable-read](bekko25-stable-read/PRODUCT.md) | 語彙表を stable memory から読む実装の検証 |
+| [bekko25-stream](bekko25-stream/RESULTS.md) | 重みの分割読み込みによる有効化時のメモリ削減 |
+| [bekko25-memory-study](bekko25-memory-study/RESULTS.md) | 容量と量子化による精度の調査 |
+| [bekko25-runtime](bekko25-runtime/RESULTS.md) | 256 tokens を 1 query に収めるまでの試作と精度の比較 |
+
+## モデル比較と Bekko a8m
+
+| 記録 | 内容 |
+| --- | --- |
+| [multilingual-global](multilingual-global/RESULTS.md) | 英語を中心とした 6 言語の検索比較 |
+| [multilingual-expanded](multilingual-expanded/RESULTS.md) | 11 モデルの英語・日本語検索比較 |
+| [multilingual](multilingual/RESULTS.md) | 日本語の検索比較（最初の比較） |
+| [embeddinggemma2](embeddinggemma2/RESULTS.md) | EmbeddingGemma 2 の試作と比較 |
+| [bekko](bekko/RESULTS.md) | Bekko a8m canister の検証 |
+| [answer-spans](answer-spans/RESULTS.md) | RAG の chunk 長と、答えを含む chunk の割合 |
+
+## Granite Small English R2
+
+Granite の現在の構成は [Granite API](../docs/API.md) と [最新の検証](query-fusion/RESULTS.md) を参照してください。以下の履歴には当時の query plan・Wasm・転送形式・計測方法が含まれます。現在の上限として読み替えないでください。
+
+### 最新の検証データ
 
 [最新の性能・5,000 tokens検証](query-fusion/RESULTS.md)と[現在のsource・Wasm検証](validation/environment.json)が最新です。
 以下のfrontierは直前の最適化・長文対応の性能記録です。
@@ -28,7 +53,7 @@
 sourceやWasmが異なる記録を比較する場合は、各environment・SHA・featureを確認してください。
 `target/`の標準ファイル名は再ビルドで変わるため、履歴のSHAが現在のファイルと同じとは限りません。
 
-## これまでの段階
+### これまでの段階
 
 新しい段階から並べています。本文の数値・成功/未達の判断は当時のものです。
 
@@ -48,5 +73,5 @@ sourceやWasmが異なる記録を比較する場合は、各environment・SHA�
 | 2026-10-26 | [optimization](optimization/RESULTS.md) | 512 tokens / 6 queryのAPIを検証 |
 | 2026-10-26 | [初版](RESULTS.md) | 低水準の演算分割で5,000 tokensを687 queryで実行。現在の公開APIとは別方式 |
 
-[FEASIBILITY.md](../FEASIBILITY.md)は実装前の設計調査です。
+[Granite の設計調査](../docs/history/granite-feasibility.md)は実装前の記録です。
 ビルド・参照生成・再測定は[開発手順](../docs/DEVELOPMENT.md)を参照してください。
