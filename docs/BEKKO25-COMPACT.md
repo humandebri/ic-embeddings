@@ -1,6 +1,6 @@
 # Bekko a25m compact canister
 
-For the public mainnet canister, anonymous query examples, tokenizer setup, and JavaScript integration, see the [public API guide](BEKKO25-PUBLIC-API.md).
+> The public mainnet canister runs this build. To call it, see the [public API guide](BEKKO25-PUBLIC-API.md). This page is for building, verifying and operating your own compact canister.
 
 `bekko25_compact` is a separate canister and embedding space. It stores the token vocabulary as 256,000 independently readable signed INT8 rows, each with a little-endian F32 scale. Other model weights retain the existing quantization. The 384-dimensional result differs numerically from the F32-vocabulary canister; retrieval quality must be evaluated on the application's actual corpus. The two spaces must not share document or query vectors.
 
